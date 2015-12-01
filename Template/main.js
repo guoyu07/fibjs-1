@@ -1,5 +1,5 @@
 var fs = require('fs');
-var template = require('template');
+var Template = require('template').Template;
 
 var data = {
 	header: {
@@ -15,7 +15,7 @@ var data = {
 	]
 };
 
-var tpl = new template.Template("./templates", "./templates");
+var tpl = new Template("./templates", "./templates");
 tpl.builds();
 
 console.log(tpl.render("view", data));
