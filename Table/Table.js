@@ -11,32 +11,43 @@ var collection = require("collection");
 /**
  * 构造函数
  * @param string table 表名
+ * @param string tab 表别名
  * @param string pk 主键
  * @param DbConnection pdo 数据库连接
  */
-function Table(table, pk, pdo) {
-		// 初始化属性
-		this._pdo = null;
-		this._table = null;
-		this._pk = "id";
-		this._keywords = [];
-		this._where = [];
-		this._where_params = [];
-		this._count_where = [];
-		this._count_where_params = [];
-		this._group = null;
-		this._having = [];
-		this._having_params = [];
-		this._order = null;
-		this._limit = null;
-		this._offset = null;
-		this._for_update = "";
-		this._lock_in_share_model = "";
+function Table(table, tab, pk, pdo) {
+	// 属性
+	this.pdo = null;
+	this.prefix = "";
+	this.table = "table";
+	this.tab = "t";
+	this.pk = "id";
+	this.debug = false;
 
-		// 参数
-		this._table = table;
-		this._pk = pk || this._pk;
-		this._pdo = pdo || null;
+	// 私有属性
+	this._keywords = [];
+	this._columns = [];
+	this._table = "";
+	this._joins = [];
+	this._wheres = [];
+	this._wheres_params = [];
+	// this._count_wheres = [];
+	// this._count_wheres_params = [];
+	this._groups = [];
+	this._havings = [];
+	this._havings_params = [];
+	this._orders = [];
+	this._limit = null;
+	this._offset = null;
+	this._for_update = "";
+	this._lock_in_share_mode = "";
+
+	// 参数
+	this.table = table || this.table;
+	this.tab = tab || this.tab;
+	this.pk = pk || this.pk;
+	this.pdo = pdo || this.pdo;
+	this._table = this.prefix+this.table;
 };
 
 // 默认设置
@@ -47,34 +58,39 @@ Table.prototype.__password = "123456";			// 默认密码
 Table.prototype.__dbname = "test";				// 默认数据库名称
 Table.prototype.__charset = "utf8";				// 默认字符集
 
+// 属性
+Table.prototype.pdo = null;						// PDO对象
+Table.prototype.prefix = "";					// 表前缀
+Table.prototype.table = "table";				// 表名
+Table.prototype.tab = "t";						// 表别名
+Table.prototype.pk = "id";						// 主键
+Table.prototype.debug = false;					// 调试模式
+
 // 私有属性
-Table.prototype._pdo = null;					// PDO对象
-Table.prototype._table = null;					// table
-Table.prototype._pk = "id";						// paramry
 Table.prototype._keywords = [];					// keywords
-Table.prototype._where = [];					// where
-Table.prototype._where_params = [];				// where params
-Table.prototype._count_where = [];				// count where
-Table.prototype._count_where_params = [];		// count where params
-Table.prototype._group = null;					// group
-Table.prototype._having = [];					// having
-Table.prototype._having_params = [];			// having params
-Table.prototype._order = null;					// order
+Table.prototype._columns = [];					// columns
+Table.prototype._table = "";					// table
+Table.prototype._joins = [];					// join
+Table.prototype._wheres = [];					// where
+Table.prototype._wheres_params = [];			// where params
+// Table.prototype._count_wheres = [];				// count where
+// Table.prototype._count_wheres_params = [];		// count where params
+Table.prototype._groups = [];					// group
+Table.prototype._havings = [];					// having
+Table.prototype._havings_params = [];			// having params
+Table.prototype._orders = [];					// order
 Table.prototype._limit = null;					// limit
 Table.prototype._offset = null;					// offset
 Table.prototype._for_update = "";				// read lock
-Table.prototype._lock_in_share_model = "";		// write lock
-
-// 属性
-Table.prototype.debug = false;					// 调试模式
+Table.prototype._lock_in_share_mode = "";		// write lock
 
 /**
  * 获取数据库连接
  * @return DbConnection
  */
 Table.prototype.getPDO = function() {
-	if (this._pdo) {
-		return this._pdo;
+	if (this.pdo) {
+		return this.pdo;
 	}
 
 	if (this.__pdo) {
@@ -82,9 +98,9 @@ Table.prototype.getPDO = function() {
 	}
 
 	var dsn = util.format("mysql://%s:%s@%s/%s", this.__user, this.__password, this.__host, this.__dbname);
-	var pdo = Table.prototype.__pdo = db.open(dsn);
+	var pdo = db.open(dsn);
 	pdo.execute("set names " + this.__charset);
-	return pdo;
+	return Table.prototype.__pdo = pdo;
 };
 
 /**
@@ -92,7 +108,18 @@ Table.prototype.getPDO = function() {
  * @return string
  */
 Table.prototype.getPK = function() {
-	return this._pk;
+	return this.pk;
+}
+
+/**
+ * 设置表前缀
+ * @param string prefix
+ * @return Table
+ */
+Table.prototype.setPrefix = function(prefix) {
+	this.prefix = prefix;
+	this._table = this.prefix+this.table;
+	return this;
 }
 
 /**
@@ -109,57 +136,56 @@ Table.prototype.query = function(sql) {
 /**
  * 执行语句
  * @param string sql
+ * @param array params
  * @return DBResult
  */
 Table.prototype.vquery = function(sql, params) {
-	var sqls = sql.split("?");
-	var sql_new = sqls.shift();
-	var params_new = [];
-	for (var i in sqls) {
-		var sql_item = sqls[i];
-		if (Array.isArray(params[i])) {
-			sql_new += "?,".repeat(params[i].length-1)+"?"+sql_item;
-			params_new = params_new.concat(params[i]);
-		} else {
-			sql_new += "?"+sql_item;
-			params_new.push(params[i]);
-		}
-	}
+	params = params || [];
 	if (this.debug) {
-		console.log(sql_new, "|", params_new.join(", "));
+		console.log(sql, "|", params.join(", "));
 	}
 	var conn = this.getPDO();
-	var stmt = conn.execute.apply(conn, [sql_new].concat(params_new));
+	var stmt = conn.execute.apply(conn, [sql].concat(params));
 	this.reset();
 	return stmt;
 }
 
 /**
  * 查询数据
- * @param string field
+ * @param string columns
  * @return DBResult
  */
 Table.prototype.select = function(columns) {
-	columns = columns || "*";
-	var params = this._where_params.concat(this._having_params);
-	var keywords = this._keywords.length == 0 ? "" : " "+this._keywords.join(" ");
-	var sql = util.format("SELECT%s %s FROM `%s`", keywords, columns, this._table);
-	sql += this._where.length == 0 ? "" : " WHERE " + this._where.join(" AND ");
-	sql += this._group == null ? "" : " GROUP BY " + this._group;
-	sql += this._having.length == 0 ? "" : " HAVING " + this._having.join(" AND ");
-	sql += this._order == null ? "" : " ORDER BY " + this._order;
-	if (this._limit) {
-		sql += " LIMIT ?";
-		params.push(this._limit);
-		if (this._offset) {
-			sql += " OFFSET ?";
-			params.push(this._offset);
-		}
+	columns = columns || null;
+	if (columns != null) {
+		this._columns.push(columns);
 	}
-	sql += this._for_update;
-	sql += this._lock_in_share_model;
-	this._count_where = this._where;
-	this._count_where_params = this._where_params;
+
+	var keywords = this._keywords.length == 0 ? "" : " "+this._keywords.join(" ");
+	var columns = this._columns.length == 0 ? "*" : this._columns.join(", ");
+	var table = this._table + (this._joins.length == 0 ? "" : "` AS `"+this.tab);
+	var joins = this._joins.length == 0 ? "" : " LEFT JOIN "+this._joins.join(" LEFT JOIN ");
+	var wheres = this._wheres.length == 0 ? "" : " WHERE "+this._wheres.join(" AND ");
+	var groups = this._groups.length == 0 ? "" : " GROUP BY "+this._groups.join(", ");
+	var havings = this._havings.length == 0 ? "" : " HAVING "+this._havings.join(" AND ");
+	var orders = this._orders.length == 0 ? "" : " ORDER BY "+this._orders.join(", ");
+	var limit = this._limit == null ? "" : " LIMIT ?";
+	var offset = this._offset == null ? "" : " OFFSET ?";
+	var forUpdate = this._for_update;
+	var lockInShareMode = this._lock_in_share_mode;
+	var sql = util.format("SELECT%s %s FROM `%s`%s%s%s%s%s%s%s%s%s", keywords, columns, table, joins, wheres, groups, havings, orders, limit, offset, forUpdate, lockInShareMode);
+
+	var params = this._wheres_params.concat(this._havings_params);
+	if (this._limit) {
+		params.push(this._limit);
+	}
+	if (this._offset) {
+		params.push(this._offset);
+	}
+
+	// this._count_wheres = this._wheres;
+	// this._count_wheres_params = this._wheres_params;
+
 	return this.vquery(sql, params);
 }
 
@@ -170,41 +196,47 @@ Table.prototype.select = function(columns) {
  * @return DBResult
  */
 Table.prototype.insert = function(data) {
-	var sql = util.format("INSERT `%s` SET", this._table);
+	var sets = [];
 	var params = [];
 	for (var col in data) {
-		sql += util.format(" `%s` = ?,", col);
+		sets.push(util.format("`%s` = ?", col));
 		params.push(data[col]);
 	}
-	sql = sql.substr(0, sql.length - 1);
+	console.dir(this._table);
+	var sql = util.format("INSERT `%s` SET %s", this._table, sets.join(", "));
 	return this.vquery(sql, params);
 }
 
 /**
  * 批量插入数据
- * @param array names
+ * @param array columns
  * @param array rows
  * @param int batch
  * @return Table
  */
-Table.prototype.batchInsert = function(fields, rows, batch) {
+Table.prototype.batchInsert = function(columns, rows, batch) {
 	batch = batch || 1000;
-	var addslashes = function(v){ return db.escape(v, true); };
+	var value = "(?"+",?".repeat(columns.length-1)+")";
+	var columns = columns.join("`,`");
+	var values = [];
+	var params = [];
 	var i = 0;
-	var sql = util.format("INSERT `%s` (`%s`) VALUES ", this._table, fields.join("`, `"));
+	var sql = "";
 	for (var n in rows) {
+		values.push(value);
+		params = params.concat(rows[n]);
 		i++;
-		sql += util.format("('%s'),", rows[n].map(addslashes).join("','"));
 		if (i >= batch) {
-			sql = sql.substr(0, sql.length - 1);
-			this.query(sql);
+			sql = util.format("INSERT `%s` (`%s`) VALUES %s", this._table, columns, values.join(","));
+			this.vquery(sql, params);
 			i = 0;
-			sql = util.format("INSERT `%s` (`%s`) VALUES ", this._table, fields.join("`"));
+			values = [];
+			params = [];
 		}
 	}
 	if (i > 0) {
-		sql = sql.substr(0, sql.length - 1);
-		this.query(sql);
+		sql = util.format("INSERT `%s` (`%s`) VALUES %s", this._table, columns, values.join(","));
+		this.vquery(sql, params);
 	}
 	return this;
 }
@@ -215,16 +247,16 @@ Table.prototype.batchInsert = function(fields, rows, batch) {
  * @return DBResult
  */
 Table.prototype.update = function(data) {
-	var sql = util.format("UPDATE `%s` SET", this._table);
+	var sets = [];
 	var params = [];
 	for (var col in data) {
-		var val = data[col];
-		sql += util.format(" `%s` = ?,", col);
-		params.push(val);
+		sets.push(util.format("`%s` = ?", col));
+		params.push(data[col]);
 	}
-	sql = sql.substr(0, sql.length - 1);
-	sql += this._where.length == 0 ? "" : " WHERE " + this._where.join(" AND ");
-	return this.vquery(sql, params.concat(this._where_params));
+	var wheres = this._wheres.length == 0 ? " WHERE 0" : " WHERE "+this._wheres.join(" AND ");
+	var sql = util.format("UPDATE `%s` SET %s%s", this._table, sets.join(", "), wheres);
+	params = params.concat(this.wheres_params);
+	return this.vquery(sql, params);
 }
 
 /**
@@ -233,16 +265,14 @@ Table.prototype.update = function(data) {
  * @return DBResult
  */
 Table.prototype.replace = function(data) {
-	var sql = util.format("REPLACE `%s` SET", this._table);
+	var sets = [];
 	var params = [];
 	for (var col in data) {
-		var val = data[col];
-		sql += util.format(" `%s` = ?,", col);
-		params.push(val);
+		sets.push(util.format("`%s` = ?", col));
+		params.push(data[col]);
 	}
-	sql = sql.substr(0, sql.length - 1);
-	sql += this._where.length == 0 ? "" : "WHERE " + this._where.join(" AND ");
-	return this.vquery(sql, params.concat(this._where_params));
+	var sql = util.format("REPLACE `%s` SET %s", this._table, sets.join(", "));
+	return this.vquery(sql, params);
 }
 
 /**
@@ -250,9 +280,9 @@ Table.prototype.replace = function(data) {
  * @return DBResult
  */
 Table.prototype.delete = function() {
-	var sql = util.format("DELETE FROM `%s`", this._table);
-	sql += this._where == 0 ? "" : " WHERE " + this._where.join(" AND ");
-	return this.vquery(sql, this._where_params);
+	var wheres = this._wheres.length == 0 ? " WHERE 0" : " WHERE "+this._wheres.join(" AND ");
+	var sql = util.format("DELETE FROM `%s`%s", this._table, wheres);
+	return this.vquery(sql, this._wheres_params);
 }
 
 /**
@@ -261,16 +291,20 @@ Table.prototype.delete = function() {
  */
 Table.prototype.reset = function() {
 	this._keywords = [];
-	this._where = [];
-	this._where_params = [];
-	this._group = null;
-	this._having = [];
-	this._having_params = [];
-	this._order = null;
+	this._columns = [];
+	this._joins = [];
+	this._wheres = [];
+	this._wheres_params = [];
+	// this._count_wheres = [];
+	// this._count_wheres_params = [];
+	this._groups = [];
+	this._havings = [];
+	this._havings_params = [];
+	this._orders = [];
 	this._limit = null;
 	this._offset = null;
 	this._for_update = "";
-	this._lock_in_share_model = "";
+	this._lock_in_share_mode = "";
 	return this;
 }
 
@@ -285,7 +319,7 @@ Table.prototype.keyword = function(keyword) {
 }
 
 /**
- * 设置 SQL_CALC_FOUND_ROWS
+ * 设置SQL_CALC_FOUND_ROWS关键字
  * @return Table
  */
 Table.prototype.calcFoundRows = function() {
@@ -293,60 +327,119 @@ Table.prototype.calcFoundRows = function() {
 }
 
 /**
- * where查询条件
- * @param string format
+ * column返回的列
+ * @param string column
  * @return Table
  */
-Table.prototype.where = function(format) {
+Table.prototype.column = function(column) {
+	this._columns.push(column);
+	return this;
+}
+
+/**
+ * join连表查询
+ * @param string join
+ * @param string cond
+ * @return Table
+ */
+Table.prototype.join = function(join, cond) {
+	this._joins.push(util.format("%s ON %s", join, cond));
+	return this;
+}
+
+/**
+ * where查询条件
+ * @param string where
+ * @return Table
+ */
+Table.prototype.where = function(where) {
 	var args = Array.apply(null, arguments);
 	args.shift();
-	this._where.push(format);
-	this._where_params = this._where_params.concat(args);
+
+	var ws = where.split("?");
+	var where = ws.shift();
+	var params = [];
+	for (var i in ws) {
+		var w = ws[i];
+		if (Array.isArray(args[i])) {
+			where += "?"+",?".repeat(args[i].length-1)+w;
+			params = params.concat(args[i]);
+		} else {
+			where += "?"+w;
+			params.push(args[i]);
+		}
+	}
+
+	this._wheres.push(where);
+	this._wheres_params = this._wheres_params.concat(params);
 	return this;
 }
 
 /**
  * group分组
- * @param string columns
+ * @param string group
  * @return Table
  */
-Table.prototype.group = function(columns) {
-	this._group = columns;
+Table.prototype.group = function(group) {
+	this._groups.push(group);
 	return this;
 }
 
 /**
  * having过滤条件
- * @param string format
+ * @param string having
  * @return Table
  */
-Table.prototype.having = function(format) {
+Table.prototype.having = function(having) {
 	var args = Array.apply(null, arguments);
 	args.shift();
-	this._having.push(format);
-	this._having_params = this._having_params.concat(args);
+
+	var ws = having.split("?");
+	var having = ws.shift();
+	var params = [];
+	for (var i in ws) {
+		var w = ws[i];
+		if (Array.isArray(args[i])) {
+			having += "?"+",?"+repeat(args[i].length-1)+w;
+			params = params.concat(args[i]);
+		} else {
+			having += "?"+w;
+			params.push(args[i]);
+		}
+	}
+
+	this._havings.push(having);
+	this._havings_params = this._havings_params.concat(params);
 	return this;
 }
 
 /**
  * order排序
- * @param string columns
+ * @param string order
  * @return Table
  */
 Table.prototype.order = function(order) {
-	this._order = order;
+	this._orders.push(order);
 	return this;
 }
 
 /**
- * limit数据偏移
- * @param int offset
+ * limit数据
  * @param int limit
  * @return Table
  */
-Table.prototype.limitOffset = function(limit, offset) {
+Table.prototype.limit = function(limit) {
 	this._limit = limit;
-	this._offset = offset || null;
+	return this;
+}
+
+/**
+ * offset偏移
+ * @param int offset
+ * @return Table
+ */
+Table.prototype.offset = function(offset) {
+	this._offset = offset;
 	return this;
 }
 
@@ -355,7 +448,7 @@ Table.prototype.limitOffset = function(limit, offset) {
  * @return Table
  */
 Table.prototype.forUpdate = function() {
-	this.forUpdate = " FOR UPDATE";
+	this._for_update = " FOR UPDATE";
 	return this;
 }
 
@@ -364,7 +457,7 @@ Table.prototype.forUpdate = function() {
  * @return Table
  */
 Table.prototype.lockInShareMode = function() {
-	this._lock_in_share_model = " LOCK IN SHARE MODE";
+	this._lock_in_share_mode = " LOCK IN SHARE MODE";
 	return this;
 }
 
@@ -419,9 +512,9 @@ Table.prototype.lastInsertId = function() {
  */
 Table.prototype.count = function() {
 	return this.vquery("SELECT FOUND_ROWS() as count").toArray()[0].count;
-	// var sql = util.format("SELECT count(*) as count FROM `%s`", this._table);
-	// sql += this._count_where == 0 ? "" : " WHERE " + this._count_where.join(" AND ");
-	// return this.vquery(sql, this._count_where_params).toArray()[0].count;
+	// var wheres = this._count_wheres.length == 0 ? "" : " WHERE "+this._count_wheres.join(" AND ");
+	// var sql = util.format("SELECT count(*) as count FROM `%s`%s", this._table, wheres);
+	// return this.vquery(sql, this._count_wheres_params).toArray()[0].count;
 }
 
 /**
@@ -441,8 +534,8 @@ Table.prototype.plus = function(col, val) {
 		sets.push(util.format("`%s` = `%s` + ?", col, col));
 		vals.push(val);
 	}
-	var sql = util.format("UPDATE `%s` SET %s", this._table, sets.join(", "));
-	sql += this._where.length == 0 ? "" : " WHERE " + this._where.join(" AND ");
+	var wheres = this._wheres.length == 0 ? " WHERE 0" : " WHERE "+this._wheres.join(" AND ");
+	var sql = util.format("UPDATE `%s` SET %s%s", this._table, sets.join(", "), wheres);
 	var params = vals.concat(this._where_params);
 	this.vquery(sql, params);
 	return this;
@@ -456,8 +549,8 @@ Table.prototype.plus = function(col, val) {
  */
 Table.prototype.incr = function(col, val) {
 	val = val || 1;
-	var sql = util.format("UPDATE `%s` SET `%s` =  last_insert_id(`%s` + ?)", this._table, col, col);
-	sql += this._where.length == 0 ? "" : " WHERE " + this._where.join(" AND ");
+	var wheres = this._wheres.length == 0 ? " WHERE 0" : " WHERE "+this._wheres.join(" AND ");
+	var sql = util.format("UPDATE `%s` SET `%s` = last_insert_id(`%s` + ?)%s", this._table, col, col, wheres);
 	var params = [val].concat(this._where_params);
 	var stmt = this.vquery(sql, params);
 	return stmt.insertId;
@@ -469,7 +562,7 @@ Table.prototype.incr = function(col, val) {
  * @return array
  */
 Table.prototype.find = function(id) {
-	return this.where(util.format("`%s` = ?", this._pk), id).select().toArray().shift();
+	return this.where(util.format("`%s` = ?", this.pk), id).select().toArray().shift();
 }
 
 /**
@@ -478,10 +571,10 @@ Table.prototype.find = function(id) {
  * @return DBResult
  */
 Table.prototype.save = function(data) {
-	if (data.hasOwnProperty(this._pk)) {
-		var pk_val = data[this._pk];
-		delete data[this._pk];
-		return this.where(util.format("`%s` = ?", this._pk), pk_val).update(data);
+	if (data.hasOwnProperty(this.pk)) {
+		var pk_val = data[this.pk];
+		delete data[this.pk];
+		return this.where(util.format("`%s` = ?", this.pk), pk_val).update(data);
 	} else {
 		return this.insert(data);
 	}
@@ -491,11 +584,11 @@ Table.prototype.save = function(data) {
  * 获取外键数据
  * @param array rows
  * @param string foreign_key
- * @param string field
+ * @param string columns
  * @return DBResult
  */
-Table.prototype.foreignKey = function(rows, foreign_key, field) {
-	field = field || "*";
+Table.prototype.foreignKey = function(rows, foreign_key, columns) {
+	columns = columns || "*";
 	var ids = {};
 	for (var i in rows) {
 		ids[rows[i][foreign_key]] = true;
@@ -505,7 +598,7 @@ Table.prototype.foreignKey = function(rows, foreign_key, field) {
 		// return new db.DBResult();
 		return new collection.List();
 	}
-	return this.where(util.format("`%s` in (?)", this._pk), ids).select(field);
+	return this.where(util.format("`%s` in (?)", this.pk), ids).select(columns);
 }
 
 exports.Table = Table;

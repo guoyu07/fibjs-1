@@ -29,36 +29,40 @@ Table.prototype.__dbname = "test";
 Table.prototype.__charset = "utf8";
 
 // 创建实体对象
-var userTable = new Table("table_user");
-var blogTable = new Table("table_blog");
+var userTable = new Table("table_user", "u");
+var blogTable = new Table("table_blog", "b");
 
 // 开启调试模式
 userTable.debug = true;
 blogTable.debug = true;
 
-// query
-var data = userTable.query("select * from table_user where id = ?", 1).toArray();
-console.dir(data);
+// sql查询
+var sql = "select * from table_user where id > ? and id < ?";
+console.dir(userTable.query(sql, 10, 20));
+console.dir(userTable.vquery(sql, [10, 20]));
 
 // 插入数据
-for (var i=1; i<=100; i++) {
+for (i=1; i<=10; i++) {
 	var user = {
-			"username": "admin"+i,
-			"password": "admin"+i,
-			"nickname": "管理员"+i,
-			"r": Math.random() * 5 | 0,
+			"username": "admini",
+			"password": "admini",
+			"nickname": "管理员i",
+			"r": Math.random() * 4 | 0,
 	};
 	var result = userTable.insert(user);
-	console.log(result.affected);
-	console.log(result.insertId);
+	console.log(result.affected, result.insertId);
 }
-// 获取数据
-console.dir(userTable.where("id > ?", 0).select().toArray());
+
+// 查询数据
+console.dir(userTable.select().toArray()); // 获取所有数据
+console.dir(userTable.select().toArray().shift()); // 获取一行数据
+console.dir(userTable.select().toArray()[0][0]); // 获取第一行第一列数据
+console.dir(userTable.select().toArray()[0][1]); // 获取第一行第二列数据
 
 // 批量插入数据
 var fields = ["username","password","nickname","r"];
 var rows = [];
-for (var i=101; i<=200; i++) {
+for (var i=11; i<=100; i++) {
 	rows.push(["admin"+i,"admin"+i,"管理员"+i,Math.random() * 4 | 0]);
 }
 userTable.batchInsert(fields, rows);
@@ -73,7 +77,6 @@ var user = {
 		"r": Math.random() * 4 | 0,
 };
 console.log(userTable.where("id = ?", 4).update(user).affected);
-
 // 根据主键查询数据
 console.dir(userTable.find(4));
 
@@ -86,13 +89,11 @@ var user = {
 		"r": Math.random() * 4 | 0,
 };
 console.log(userTable.replace(user).affected);
-
 // 根据主键查询数据
 console.dir(userTable.find(4));
 
 // 删除数据
 console.log(userTable.where("id = ?", 4).delete().affected);
-
 // 根据主键查询数据
 console.dir(userTable.find(4));
 
@@ -106,7 +107,7 @@ console.dir(userTable.group("r").having("c between ? and ?", 1, 40).having("c > 
 console.dir(userTable.order("username, id desc").select().toArray());
 
 // 限制行数
-console.dir(userTable.limitOffset(3, 3).select().toArray());
+console.dir(userTable.limit(3).offset(3).select().toArray());
 
 // 分页
 console.dir(userTable.page(3, 3).select().toArray());
@@ -119,6 +120,9 @@ console.log(userTable.count());
 console.dir(userTable.where("id > ?", 0).where("id < ?", 100)
 	.group("r").having("c between ? and ?", 1, 100).having("c > ?", 1)
 	.order("c desc").page(2, 3).select("*, count(*) as c").toArray());
+
+// 联合查询
+console.dir(blogTable.join("table_user AS u", "b.user_id = u.id").where("b.id < ?", 20).select("b.*, u.username").toArray());
 
 // 列加减
 var id = 2;
@@ -148,6 +152,7 @@ var user = {
 };
 console.log(userTable.save(user).affected);
 console.dir(userTable.find(id));
+
 // 保存 添加
 user = {
 		"username": "admin11",
