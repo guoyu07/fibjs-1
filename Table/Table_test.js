@@ -24,7 +24,7 @@ var Table = tab.Table;
 // 初始化
 Table.prototype.__host = "127.0.0.1";
 Table.prototype.__user = "root";
-Table.prototype.__password = "";
+Table.prototype.__password = "123456";
 Table.prototype.__dbname = "test";
 Table.prototype.__charset = "utf8";
 

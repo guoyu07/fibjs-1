@@ -41,7 +41,7 @@ Template.prototype.parse = function (js) {
 };
 
 Template.prototype.build = function (name, source, target) {
-	var content = fs.readFile(source);
+	var content = fs.readFile(source).toString();
 
 	var prefix = "var template=require('template');template.Template.prototype.tpls_" + name + "=function(vars){var data=vars;var html='";
 	var suffix = "';return html;};";
