@@ -1,14 +1,68 @@
-// copyright dotcoo@163.com
+<!DOCTYPE html>
+<html>
+<head>
+<title>Template</title>
+</head>
+<body>
+</body>
+<script type="text/template" name="header">
+<div>{{.title}}</div>
+</script>
+<script type="text/template" name="footer">
+<div>{{.copyright}}</div>
+</script>
+<script type="text/template" name="view">
+{{template header .header}}
 
+{{if .books}}
+{{elseif .books}}
+{{else}}
+{{end}}
+
+{{if data.books.length > 0}}
+{{elseif data.books.length > 1}}
+{{else}}
+{{end}}
+
+{{/* 商品数量 */}}
+<div>book count: {{data.books.length}}</div>
+
+{{/* 商品列表 */}}
+<div>
+	<table>
+{{range .books}}
+		<tr>
+			<td>{{.id}}</td>
+			<td>{{.name}}</td>
+			<td>{{.price}}</td>
+			<td>{{.cover}}</td>
+		</tr>
+{{endrange}}
+	</table>
+</div>
+
+{{/* 商品列表 */}}
+<div>
+	<table>
+{{range var i in data.books}}
+{{#data = data.books[i]}}
+		<tr>
+			<td>{{.id}}</td>
+			<td>{{.name}}</td>
+			<td>{{.price}}</td>
+			<td>{{.cover}}</td>
+		</tr>
+{{endrange}}
+	</table>
+</div>
+
+{{template footer .footer}}
+</script>
+<script type="text/javascript">
+// copyright dotcoo@163.com
 // template librarry
 // author : dotcoo@163.com
-
-var fs = require("fs");
-var path = require("path");
-
-function Template(source) {
-	this.source = path.fullpath(source ? source : "templates");
-};
+function Template(source, target) {};
 
 Template.prototype.parse = function (js) {
 	js = js.replace(/\\/g, 								"\\\\");
@@ -37,8 +91,7 @@ Template.prototype.parse = function (js) {
 	return js;
 };
 
-Template.prototype.build = function (name, source) {
-	var content = fs.readFile(source).toString();
+Template.prototype.build = function (name, content) {
 	var prefix = "var data=_data;var html='";
 	var suffix = "';return html;";
 	var js = prefix + this.parse(content) + suffix;
@@ -46,15 +99,13 @@ Template.prototype.build = function (name, source) {
 };
 
 Template.prototype.builds = function () {
-	var tpls = fs.readdir(this.source);
+	var tpls = document.getElementsByTagName("script");
 	for (var i = 0; i < tpls.length; i++) {
 		var tpl = tpls[i];
-		if (tpl.isDirectory() || path.extname(tpl.name) !== ".tpl") {
+		if (tpl.type != "text/template") {
 			continue;
 		}
-		var name = path.basename(tpl.name, ".tpl");
-		var source = this.source + "/" + name + ".tpl";
-		this.build(name, source);
+		this.build(tpl.getAttribute("name"), tpl.innerHTML);
 	}
 };
 
@@ -64,5 +115,25 @@ Template.prototype.render = function (name, _data) {
 	}
 	return this["tpls_" + name](_data);
 };
+</script>
+<script type="text/javascript">
+var data = {
+	header: {
+		title: 'page title'
+	},
+	footer: {
+		copyright: 'page end'
+	},
+	books: [
+		{id:1, name:"java", price:45, cover:"java.png"},
+		{id:2, name:".net", price:40, cover:"net.png"},
+		{id:3, name:"php", price:60, cover:"php.png"}
+	]
+};
 
-exports.Template = Template;
+var tpl = new Template();
+tpl.builds();
+document.body.innerHTML = tpl.render("view", data);
+// console.log(tpl.render("view", data));
+</script>
+</html>
